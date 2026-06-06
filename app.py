@@ -10,68 +10,96 @@ import streamlit.components.v1 as components
 import itertools
 from datetime import datetime, timezone, timedelta
 
-# --- 網頁基本設定 (更改標題) ---
+# --- 網頁基本設定 ---
 st.set_page_config(page_title="HLF賓果AI分析系統", layout="wide")
 
-# --- 啟動記憶體功能 ---
 if "ai_predicted" not in st.session_state:
     st.session_state.ai_predicted = []
 if "ai_star_num" not in st.session_state:
     st.session_state.ai_star_num = 0
 
-# --- 質感深色主題與表格寬度強制調整 ---
+# --- 質感深色主題、手機自適應與表格 CSS ---
 st.markdown("""
 <style>
-    .stApp { background-color: #0e1117 !important; }
-    body, p, span, div, li, h1, h2, h3, h4, h5, h6, label { color: #e2e8f0 !important; }
+    .stApp { background-color: #0a0e17 !important; }
+    body, p, span, div, li, h2, h3, h4, h5, h6, label { color: #e2e8f0 !important; }
     
+    /* 1. 標題自適應：保證單行、不破版 */
+    h1 {
+        font-size: clamp(1.2rem, 3.5vw, 2.5rem) !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        color: #e2e8f0 !important;
+        padding-bottom: 0px !important;
+    }
+
+    /* 2. 讓統計頁籤 (Tabs) 在手機上自動換行，免滑動 */
+    div[data-baseweb="tab-list"] {
+        flex-wrap: wrap !important;
+        gap: 5px;
+        justify-content: center;
+    }
+    div[data-baseweb="tab"] {
+        flex-grow: 1;
+        padding: 8px !important;
+        white-space: nowrap;
+        background-color: #1a202c !important;
+        border: 1px solid #2d3748 !important;
+        border-radius: 5px;
+        margin-bottom: 5px;
+    }
+
+    /* 下拉選單修復 */
     div[data-baseweb="select"] > div { background-color: #2d3748 !important; border-color: #4a5568 !important; }
     div[data-baseweb="select"] span { color: #ffffff !important; font-weight: bold; }
-    div[data-baseweb="popover"] > div { background-color: #2d3748 !important; }
-    ul[role="listbox"] { background-color: #2d3748 !important; }
-    li[role="option"] { color: #ffffff !important; background-color: #2d3748 !important; }
+    div[data-baseweb="popover"] > div, ul[role="listbox"], li[role="option"] { background-color: #2d3748 !important; color: #ffffff !important; }
     li[role="option"]:hover { background-color: #4a5568 !important; }
 
-    /* 專業表格樣式與寬度鎖定 */
-    table { width: 100%; border-collapse: collapse; background-color: #1a202c !important; color: #e2e8f0 !important; font-size: 14px; margin-bottom: 20px; }
-    th, td { border: 1px solid #4a5568 !important; padding: 10px; text-align: left; }
-    th { background-color: #2d3748 !important; color: #63b3ed !important; }
-    
-    /* 強制分配表格三個欄位的寬度比例 */
-    table th:nth-child(1), table td:nth-child(1) { width: 12% !important; text-align: center !important; }
-    table th:nth-child(2), table td:nth-child(2) { width: 44% !important; }
-    table th:nth-child(3), table td:nth-child(3) { width: 44% !important; }
-
+    /* 儀表板卡片 */
     div[data-testid="metric-container"] {
-        background-color: #1a202c !important; border: 1px solid #2d3748 !important;
-        border-top: 3px solid #3182ce !important; padding: 15px; border-radius: 8px; text-align: center;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        background-color: #111827 !important; border: 1px solid #1f2937 !important;
+        border-top: 3px solid #3b82f6 !important; padding: 15px; border-radius: 8px; text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    div[data-testid="metric-container"] div { color: #63b3ed !important; }
+    div[data-testid="metric-container"] div { color: #60a5fa !important; }
 
+    /* AI 按鈕樣式 */
     div.stButton > button {
-        background: linear-gradient(180deg, #2b6cb0 0%, #2c5282 100%) !important;
-        color: #ffffff !important; font-weight: bold !important; border: 1px solid #4299e1 !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.3s ease;
+        background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%) !important;
+        color: #ffffff !important; font-weight: bold !important; border: 1px solid #3b82f6 !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5); transition: all 0.3s ease;
     }
-    div.stButton > button:hover { background: linear-gradient(180deg, #3182ce 0%, #2b6cb0 100%) !important; border: 1px solid #63b3ed !important; transform: translateY(-2px); }
+    div.stButton > button:hover { background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important; border: 1px solid #60a5fa !important; transform: translateY(-2px); }
 
-    .ball-container { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 12px; padding: 10px 0; }
+    /* 專屬精美響應式表格 (給歷史紀錄與獎金表使用) */
+    .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .jyb-table { width: 100%; border-collapse: collapse; background-color: #111827; color: #e2e8f0; font-size: 14px; text-align: center; }
+    .jyb-table th { background-color: #1f2937; color: #60a5fa; padding: 10px; border: 1px solid #374151; white-space: nowrap; font-weight: bold; }
+    .jyb-table td { padding: 8px; border: 1px solid #374151; }
+    
+    /* 手機版表格字體縮小 */
+    @media (max-width: 768px) {
+        .jyb-table { font-size: 12px; }
+        .jyb-table th, .jyb-table td { padding: 5px; }
+    }
+
+    /* 彩券球 */
+    .ball-container { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 10px; padding: 10px 0; }
     .lottery-ball {
-        display: inline-block; width: 45px; height: 45px; line-height: 45px;
-        border-radius: 50%; color: #ffffff !important; font-size: 20px; font-weight: bold; text-align: center;
-        background: radial-gradient(circle at 30% 30%, #ff4b4b, #9b0000); box-shadow: 0 0 8px rgba(255, 75, 75, 0.4);
+        display: inline-block; width: 42px; height: 42px; line-height: 42px;
+        border-radius: 50%; color: #ffffff !important; font-size: 18px; font-weight: bold; text-align: center;
+        background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
     }
-    .lottery-ball-cold { background: radial-gradient(circle at 30% 30%, #4fd1c5, #285e61) !important; box-shadow: 0 0 8px rgba(79, 209, 197, 0.4) !important; }
-    .lottery-ball-latest { background: radial-gradient(circle at 30% 30%, #3182ce, #153e75) !important; box-shadow: 0 0 8px rgba(49, 130, 206, 0.4) !important; }
+    .lottery-ball-cold { background: radial-gradient(circle at 30% 30%, #14b8a6, #0f766e) !important; box-shadow: 0 0 8px rgba(20, 184, 166, 0.4) !important; }
+    .lottery-ball-latest { background: radial-gradient(circle at 30% 30%, #3b82f6, #1d4ed8) !important; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4) !important; }
     .lottery-ball-super { 
-        background: radial-gradient(circle at 30% 30%, #ecc94b, #b7791f) !important; 
-        box-shadow: 0 0 12px rgba(236, 201, 75, 0.8) !important; 
-        color: #1a202c !important;
+        background: radial-gradient(circle at 30% 30%, #fbbf24, #b45309) !important; 
+        box-shadow: 0 0 12px rgba(251, 191, 36, 0.8) !important; 
+        color: #111827 !important;
     }
-
-    .stat-item { display: flex; flex-direction: column; align-items: center; margin: 5px; }
-    .stat-label { font-size: 13px; color: #a0aec0; margin-top: 6px; font-weight: bold; }
+    .stat-item { display: flex; flex-direction: column; align-items: center; margin: 3px; }
+    .stat-label { font-size: 12px; color: #9ca3af; margin-top: 4px; font-weight: bold; }
     .double-ball-wrapper { display: flex; gap: 2px; }
 </style>
 """, unsafe_allow_html=True)
@@ -113,9 +141,8 @@ def fetch_real_bingo_data():
                     odd_count = sum(1 for n in draw if n % 2 != 0)
                     data.append({
                         "期數": period_text, 
-                        "開獎號碼": ", ".join([f"{n:02d}" for n in draw]), 
                         "超級獎號": super_num,
-                        "大小比例": f"大 {big_count} : 小 {20-big_count}", 
+                        "大小比例": f"<span style='color:#ef4444'>大 {big_count}</span> : <span style='color:#60a5fa'>小 {20-big_count}</span>", 
                         "奇偶比例": f"奇 {odd_count} : 偶 {20-odd_count}", 
                         "原始陣列": draw 
                     })
@@ -128,25 +155,25 @@ def fetch_real_bingo_data():
             super_num = random.choice(draw)
             big_count = sum(1 for n in draw if n >= 41)
             odd_count = sum(1 for n in draw if n % 2 != 0)
-            data.append({"期數": str(period_num), "開獎號碼": ", ".join([f"{n:02d}" for n in draw]), "超級獎號": super_num, "大小比例": f"大 {big_count} : 小 {20-big_count}", "奇偶比例": f"奇 {odd_count} : 偶 {20-odd_count}", "原始陣列": draw})
+            data.append({"期數": str(period_num), "超級獎號": super_num, "大小比例": f"大 {big_count} : 小 {20-big_count}", "奇偶比例": f"奇 {odd_count} : 偶 {20-odd_count}", "原始陣列": draw})
         return pd.DataFrame(data), False, str(e)
 
 col_title, col_clock = st.columns([2, 1])
 with col_title:
-    st.title("🏆 HLF 賓果 AI 分析系統")
+    st.markdown("<h1>🏆 HLF 賓果 AI 分析系統</h1>", unsafe_allow_html=True)
     
 with col_clock:
     clock_html = """
     <div style="text-align: right; font-family: monospace;">
-        <div id="clock" style="font-size: 20px; font-weight: bold; color: #63b3ed; padding-top: 10px;"></div>
-        <div id="countdown" style="font-size: 13px; color: #fc8181; margin-top: 5px; font-weight: bold;"></div>
+        <div id="clock" style="font-size: 18px; font-weight: bold; color: #60a5fa; padding-top: 10px;"></div>
+        <div id="countdown" style="font-size: 12px; color: #ef4444; margin-top: 5px; font-weight: bold;"></div>
     </div>
     <script>
         var timeLeft = 60;
         function updateAll() {
             var now = new Date();
             document.getElementById('clock').innerText = now.toLocaleDateString('zh-TW') + " " + now.toLocaleTimeString('zh-TW', { hour12: false });
-            document.getElementById('countdown').innerText = "🔄 距離自動更新資料： " + timeLeft + " 秒";
+            document.getElementById('countdown').innerText = "🔄 距離更新： " + timeLeft + " 秒";
             timeLeft--;
             if (timeLeft < 0) {
                 timeLeft = 60; 
@@ -159,7 +186,7 @@ with col_clock:
         setInterval(updateAll, 1000); updateAll();
     </script>
     """
-    components.html(clock_html, height=70)
+    components.html(clock_html, height=60)
 
 if st.button("🔄 手動更新資料", key="hidden_refresh"):
     st.cache_data.clear()
@@ -217,7 +244,6 @@ if pred_type:
     with st.spinner("AI 核心演算法正在解析盤勢..."):
         time.sleep(0.5) 
         predicted = []
-        
         hot_pool = [item[0] for item in hot_20]
         cold_pool = [item[0] for item in cold_20]
         overdue_pool = [item[0] for item in overdue_20]
@@ -269,7 +295,8 @@ for i in range(len(recent_30_arrays) - 1):
         for pair in itertools.combinations(sorted(intersect), 2): double_consec_counts[pair] += 1
 top_double_consec = double_consec_counts.most_common(10)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔥 總熱門前20碼", "❄️ 總冷門前20碼", "🔁 熱門連莊號", "👯 雙連莊號碼", "⏳ 最久未開 (遺漏)"])
+# 縮短頁籤文字，確保手機版完美呈現
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔥 熱門", "❄️ 冷門", "🔁 連莊", "👯 雙連", "⏳ 遺漏"])
 with tab1: st.markdown(render_stat_balls(hot_20, "次"), unsafe_allow_html=True)
 with tab2: st.markdown(render_stat_balls(cold_20, "次", is_cold=True), unsafe_allow_html=True)
 with tab3: 
@@ -281,13 +308,41 @@ with tab4:
 with tab5: st.markdown(render_stat_balls(overdue_20, "期", is_cold=True), unsafe_allow_html=True)
 st.markdown("---")
 
-# ======== 區塊四：歷史明細 (收合設計) ========
+# ======== 區塊四：歷史明細 (手機自適應 HTML 表格) ========
 with st.expander("📋 展開查看完整歷史開獎明細清單 (近 200 期)", expanded=False):
-    df_display = df_history.drop(columns=['原始陣列'])
-    st.dataframe(df_display, use_container_width=True, height=400)
+    # 用 HTML 兜出響應式表格，取代原本不靈活的 st.dataframe
+    history_html = """
+    <div class='table-responsive'>
+        <table class='jyb-table'>
+            <thead>
+                <tr>
+                    <th style='width: 15%;'>期數</th>
+                    <th style='width: 55%; text-align: left;'>開獎號碼 (金字為超級獎號)</th>
+                    <th style='width: 15%;'>大小</th>
+                    <th style='width: 15%;'>奇偶</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    for idx, row in df_history.iterrows():
+        nums = row['原始陣列']
+        s_num = row['超級獎號']
+        num_str_list = []
+        for n in nums:
+            if n == s_num:
+                num_str_list.append(f"<span style='color: #fbbf24; font-weight: 900;'>{n:02d}</span>")
+            else:
+                num_str_list.append(f"{n:02d}")
+        # 用空白取代逗號，在手機上更緊湊
+        joined_nums = "&nbsp;&nbsp;".join(num_str_list)
+        
+        history_html += f"<tr><td>{row['期數']}</td><td style='text-align: left; letter-spacing: 0.5px;'>{joined_nums}</td><td>{row['大小比例']}</td><td>{row['奇偶比例']}</td></tr>"
+    
+    history_html += "</tbody></table></div>"
+    st.markdown(history_html, unsafe_allow_html=True)
 st.markdown("---")
 
-# ======== 區塊五：玩法介紹與免責聲明 ========
+# ======== 區塊五：玩法介紹與免責聲明 (完美跨欄表格) ========
 st.header("💡 BINGO BINGO 賓果賓果 玩法與獎金規則")
 st.markdown("""
 **【多樣化玩法介紹】**
@@ -298,20 +353,30 @@ st.markdown("""
 """)
 
 st.markdown("""
-**【星件玩法獎金分配表 (以單注 25 元為例)】**
-| 玩法 | 對中號碼數與對應獎金 | 容錯與保底獎金 |
-|---|---|---|
-| **10星** | 中 10：**5,000,000 元** <br> 中 9：250,000 元 <br> 中 8：25,000 元 | 中 7：2,500 元 <br> 中 6：250 元 <br> 中 5 / 中 0：皆 25 元 |
-| **9星** | 中 9：**1,000,000 元** <br> 中 8：100,000 元 <br> 中 7：3,000 元 | 中 6：500 元 <br> 中 5：100 元 <br> 中 4 / 中 0：皆 25 元 |
-| **8星** | 中 8：**500,000 元** <br> 中 7：20,000 元 | 中 6：1,000 元 <br> 中 5：200 元 <br> 中 4 / 中 0：皆 25 元 |
-| **7星** | 中 7：**80,000 元** <br> 中 6：3,000 元 | 中 5：300 元 <br> 中 4：50 元 <br> 中 3：25 元 |
-| **6星** | 中 6：**25,000 元** <br> 中 5：1,000 元 | 中 4：200 元 <br> 中 3：25 元 |
-| **5星** | 中 5：**7,500 元** <br> 中 4：500 元 | 中 3：50 元 |
-| **4星** | 中 4：**1,000 元** <br> 中 3：100 元 | 中 2：25 元 |
-| **3星** | 中 3：**500 元** | 中 2：50 元 |
-| **2星** | 中 2：**75 元** | |
-| **1星** | 中 1：**50 元** | |
-*(註：以上為基本倍數獎金，若該期總中獎金額超過官方上限，將依台彩規定按比例分配)*
+<div class='table-responsive'>
+    <table class='jyb-table'>
+        <thead>
+            <tr>
+                <th style='width: 12%; text-align: center;'>玩法</th>
+                <th style='width: 44%;'>對中號碼數與對應獎金</th>
+                <th style='width: 44%;'>容錯與保底獎金</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td style='text-align: center;'><b>10星</b></td><td>中 10：<b style='color:#ef4444'>5,000,000 元</b><br>中 9：250,000 元<br>中 8：25,000 元</td><td>中 7：2,500 元<br>中 6：250 元<br>中 5 / 中 0：皆 25 元</td></tr>
+            <tr><td style='text-align: center;'><b>9星</b></td><td>中 9：<b style='color:#ef4444'>1,000,000 元</b><br>中 8：100,000 元<br>中 7：3,000 元</td><td>中 6：500 元<br>中 5：100 元<br>中 4 / 中 0：皆 25 元</td></tr>
+            <tr><td style='text-align: center;'><b>8星</b></td><td>中 8：<b style='color:#ef4444'>500,000 元</b><br>中 7：20,000 元</td><td>中 6：1,000 元<br>中 5：200 元<br>中 4 / 中 0：皆 25 元</td></tr>
+            <tr><td style='text-align: center;'><b>7星</b></td><td>中 7：<b style='color:#ef4444'>80,000 元</b><br>中 6：3,000 元</td><td>中 5：300 元<br>中 4：50 元<br>中 3：25 元</td></tr>
+            <tr><td style='text-align: center;'><b>6星</b></td><td>中 6：<b style='color:#ef4444'>25,000 元</b><br>中 5：1,000 元</td><td>中 4：200 元<br>中 3：25 元</td></tr>
+            <tr><td style='text-align: center;'><b>5星</b></td><td>中 5：<b style='color:#ef4444'>7,500 元</b><br>中 4：500 元</td><td>中 3：50 元</td></tr>
+            <tr><td style='text-align: center;'><b>4星</b></td><td>中 4：<b style='color:#ef4444'>1,000 元</b><br>中 3：100 元</td><td>中 2：25 元</td></tr>
+            <tr><td style='text-align: center;'><b>3星</b></td><td>中 3：<b style='color:#ef4444'>500 元</b></td><td>中 2：50 元</td></tr>
+            <tr><td style='text-align: center;'><b>2星</b></td><td>中 2：<b style='color:#ef4444'>75 元</b></td><td></td></tr>
+            <tr><td style='text-align: center;'><b>1星</b></td><td>中 1：<b style='color:#ef4444'>50 元</b></td><td></td></tr>
+            <tr><td colspan='3' style='text-align: center; color: #9ca3af; font-size: 12px; padding: 12px;'>(註：以上為基本倍數獎金，若該期總中獎金額超過官方上限，將依台彩規定按比例分配)</td></tr>
+        </tbody>
+    </table>
+</div>
 """, unsafe_allow_html=True)
 
 st.warning("""
@@ -323,4 +388,4 @@ st.warning("""
 # --- 系統更新時間標籤 ---
 tw_tz = timezone(timedelta(hours=8))
 current_time = datetime.now(tw_tz).strftime("%Y-%m-%d %H:%M:%S")
-st.markdown(f"<div style='text-align: center; color: #718096; margin-top: 50px; font-size: 12px;'>系統最後更新時間：{current_time} (依據伺服器自動校時)</div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align: center; color: #6b7280; margin-top: 50px; font-size: 12px;'>系統最後更新時間：{current_time} (依據伺服器自動校時)</div>", unsafe_allow_html=True)
