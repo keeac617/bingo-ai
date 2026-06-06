@@ -10,8 +10,8 @@ import streamlit.components.v1 as components
 import itertools
 from datetime import datetime, timezone, timedelta
 
-# --- 網頁基本設定 ---
-st.set_page_config(page_title="旗艦版賓果數據預報", layout="wide")
+# --- 網頁基本設定 (更改標題) ---
+st.set_page_config(page_title="HLF賓果AI分析系統", layout="wide")
 
 # --- 啟動記憶體功能 ---
 if "ai_predicted" not in st.session_state:
@@ -19,7 +19,7 @@ if "ai_predicted" not in st.session_state:
 if "ai_star_num" not in st.session_state:
     st.session_state.ai_star_num = 0
 
-# --- 質感深色主題與下拉選單徹底修復 ---
+# --- 質感深色主題與表格寬度強制調整 ---
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; }
@@ -32,9 +32,15 @@ st.markdown("""
     li[role="option"] { color: #ffffff !important; background-color: #2d3748 !important; }
     li[role="option"]:hover { background-color: #4a5568 !important; }
 
+    /* 專業表格樣式與寬度鎖定 */
     table { width: 100%; border-collapse: collapse; background-color: #1a202c !important; color: #e2e8f0 !important; font-size: 14px; margin-bottom: 20px; }
     th, td { border: 1px solid #4a5568 !important; padding: 10px; text-align: left; }
     th { background-color: #2d3748 !important; color: #63b3ed !important; }
+    
+    /* 強制分配表格三個欄位的寬度比例 */
+    table th:nth-child(1), table td:nth-child(1) { width: 12% !important; text-align: center !important; }
+    table th:nth-child(2), table td:nth-child(2) { width: 44% !important; }
+    table th:nth-child(3), table td:nth-child(3) { width: 44% !important; }
 
     div[data-testid="metric-container"] {
         background-color: #1a202c !important; border: 1px solid #2d3748 !important;
@@ -127,7 +133,7 @@ def fetch_real_bingo_data():
 
 col_title, col_clock = st.columns([2, 1])
 with col_title:
-    st.title("🏆 Bingo 專業大數據終端分析系統")
+    st.title("🏆 HLF 賓果 AI 分析系統")
     
 with col_clock:
     clock_html = """
@@ -285,10 +291,10 @@ st.markdown("---")
 st.header("💡 BINGO BINGO 賓果賓果 玩法與獎金規則")
 st.markdown("""
 **【多樣化玩法介紹】**
-* **基本星件玩法**：玩家可從 01 至 80 號中任選 1 到 10 個號碼進行投注（即 1星至 10星玩法）。系統每期將隨機開出 20 個獎號，只要您的選號與開出獎號符合該星等的中獎條件，即可獲得對應獎金。
-* **超級獎號**：每期開出的第 20 個號碼即為專屬的「超級獎號」。玩家可選擇附加投注超級獎號玩法，只要您的選號中包含此超級獎號，即可贏得更高額的專屬加倍獎金。
-* **猜大小**：預測當期 20 個開獎號碼的整體落球分佈。若認為「小號碼 (01～40)」將開出 13 顆 (含) 以上，可投注「猜小」；若認為「大號碼 (41～80)」將開出 13 顆 (含) 以上，則投注「猜大」。猜中即獲得 6 倍獎金 (單注獎金 150 元)。
-* **猜單雙**：預測當期 20 個獎號的單雙數分佈。若認為「單數 (01, 03...79)」開出 13 顆 (含) 以上，可投注「猜單」；若認為「雙數 (02, 04...80)」開出 13 顆 (含) 以上，則投注「猜雙」。猜中亦可獲得 6 倍獎金 (單注獎金 150 元)。
+* **基本星件玩法**：選號範圍為 01～80，您可以任意選擇玩 1～10 個號碼的玩法（稱為「1星」至「10星」）。每次開獎時，電腦系統將隨機開出 20 個獎號，只要您的選號符合該期任一種中獎情形，即為中獎。
+* **超級獎號**：每期開出的第 20 個獎號即當期的「超級獎號」。您可以針對當期的超級獎號進行預測，猜對即贏得高額加倍獎金。
+* **猜大小**：您可就當期開出的 20 個獎號中，預測較小的號碼（01～40號）或較大的號碼（41～80號）開出的個數。認為小號碼開出 13 顆 (含) 以上，可投注「猜小」；認為大號碼開出 13 顆 (含) 以上，則投注「猜大」，猜中即為中獎。
+* **猜單雙**：您可預測當期 20 個獎號中，單數 (01、03...79) 與雙數 (02、04...80) 開出的個數。認為單數開出 13 顆 (含) 以上，可投注「猜單」；認為雙數開出 13 顆 (含) 以上，則投注「猜雙」，猜中即為中獎。
 """)
 
 st.markdown("""
