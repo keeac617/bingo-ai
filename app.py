@@ -8,46 +8,51 @@ import time
 import re
 import streamlit.components.v1 as components
 import itertools
+import os
 from datetime import datetime, timezone, timedelta
 
 # --- 網頁基本設定 ---
 st.set_page_config(page_title="HLF賓果AI分析系統", layout="wide")
+
+# --- 攔截手動更新的網址參數 ---
+# 當使用者點擊 iframe 裡的手動更新時，會帶有 refresh=1 的參數
+if st.query_params.get("refresh") == "1":
+    st.cache_data.clear()
+    del st.query_params["refresh"]
 
 if "ai_predicted" not in st.session_state:
     st.session_state.ai_predicted = []
 if "ai_star_num" not in st.session_state:
     st.session_state.ai_star_num = 0
 
-# --- 質感深色主題、手機自適應與表格 CSS ---
+# --- 質感深色主題、手機自適應與卡片 CSS ---
 st.markdown("""
 <style>
     .stApp { background-color: #0a0e17 !important; }
     body, p, span, div, li, h2, h3, h4, h5, h6, label { color: #e2e8f0 !important; }
     
-    /* 1. 標題自適應：保證單行、不破版 */
+    /* 1. 標題自適應：精準動態縮放，保證單行且夠大 */
     h1 {
-        font-size: clamp(1.2rem, 3.5vw, 2.5rem) !important;
+        font-size: min(7vw, 2.5rem) !important;
         white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
         color: #e2e8f0 !important;
+        letter-spacing: -0.5px;
         padding-bottom: 0px !important;
+        margin-bottom: 5px !important;
     }
 
-    /* 2. 讓統計頁籤 (Tabs) 在手機上自動換行，免滑動 */
+    /* 2. 統計頁籤間隔拉大，防誤觸 */
     div[data-baseweb="tab-list"] {
         flex-wrap: wrap !important;
-        gap: 5px;
-        justify-content: center;
+        gap: 12px !important;
+        justify-content: flex-start;
     }
     div[data-baseweb="tab"] {
-        flex-grow: 1;
-        padding: 8px !important;
-        white-space: nowrap;
-        background-color: #1a202c !important;
-        border: 1px solid #2d3748 !important;
-        border-radius: 5px;
-        margin-bottom: 5px;
+        padding: 10px 15px !important;
+        margin-bottom: 8px !important;
+        background-color: #1f2937 !important;
+        border: 1px solid #374151 !important;
+        border-radius: 6px;
     }
 
     /* 下拉選單修復 */
@@ -72,19 +77,39 @@ st.markdown("""
     }
     div.stButton > button:hover { background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important; border: 1px solid #60a5fa !important; transform: translateY(-2px); }
 
-    /* 專屬精美響應式表格 (給歷史紀錄與獎金表使用) */
-    .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    /* 玩法與獎金表格 */
+    .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
     .jyb-table { width: 100%; border-collapse: collapse; background-color: #111827; color: #e2e8f0; font-size: 14px; text-align: center; }
-    .jyb-table th { background-color: #1f2937; color: #60a5fa; padding: 10px; border: 1px solid #374151; white-space: nowrap; font-weight: bold; }
+    .jyb-table th { background-color: #1f2937; color: #60a5fa; padding: 10px; border: 1px solid #374151; font-weight: bold; }
     .jyb-table td { padding: 8px; border: 1px solid #374151; }
+    @media (max-width: 768px) { .jyb-table { font-size: 12px; } .jyb-table th, .jyb-table td { padding: 5px; } }
+
+    /* 歷史紀錄專屬卡片 (完美解決左右滑動問題) */
+    .history-card {
+        background-color: #111827; border: 1px solid #374151; border-radius: 8px;
+        padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .history-header {
+        display: flex; justify-content: space-between; align-items: center;
+        border-bottom: 1px solid #1f2937; padding-bottom: 8px; margin-bottom: 10px; font-size: 14px;
+    }
+    .history-period { font-weight: bold; color: #60a5fa; font-size: 16px; }
+    .history-stats { color: #9ca3af; font-size: 13px; }
+    .history-balls { display: flex; flex-wrap: wrap; gap: 6px; }
     
-    /* 手機版表格字體縮小 */
-    @media (max-width: 768px) {
-        .jyb-table { font-size: 12px; }
-        .jyb-table th, .jyb-table td { padding: 5px; }
+    /* 歷史紀錄專屬小球 */
+    .h-ball {
+        width: 32px; height: 32px; line-height: 32px; border-radius: 50%;
+        text-align: center; font-size: 14px; font-weight: bold; color: white;
+        background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .h-ball-super { 
+        background: radial-gradient(circle at 30% 30%, #fbbf24, #b45309); 
+        color: #111827; box-shadow: 0 0 6px rgba(251, 191, 36, 0.8); 
     }
 
-    /* 彩券球 */
+    /* 預測與統計大球 */
     .ball-container { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 10px; padding: 10px 0; }
     .lottery-ball {
         display: inline-block; width: 42px; height: 42px; line-height: 42px;
@@ -93,11 +118,8 @@ st.markdown("""
     }
     .lottery-ball-cold { background: radial-gradient(circle at 30% 30%, #14b8a6, #0f766e) !important; box-shadow: 0 0 8px rgba(20, 184, 166, 0.4) !important; }
     .lottery-ball-latest { background: radial-gradient(circle at 30% 30%, #3b82f6, #1d4ed8) !important; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4) !important; }
-    .lottery-ball-super { 
-        background: radial-gradient(circle at 30% 30%, #fbbf24, #b45309) !important; 
-        box-shadow: 0 0 12px rgba(251, 191, 36, 0.8) !important; 
-        color: #111827 !important;
-    }
+    .lottery-ball-super { background: radial-gradient(circle at 30% 30%, #fbbf24, #b45309) !important; box-shadow: 0 0 12px rgba(251, 191, 36, 0.8) !important; color: #111827 !important; }
+
     .stat-item { display: flex; flex-direction: column; align-items: center; margin: 3px; }
     .stat-label { font-size: 12px; color: #9ca3af; margin-top: 4px; font-weight: bold; }
     .double-ball-wrapper { display: flex; gap: 2px; }
@@ -158,38 +180,36 @@ def fetch_real_bingo_data():
             data.append({"期數": str(period_num), "超級獎號": super_num, "大小比例": f"大 {big_count} : 小 {20-big_count}", "奇偶比例": f"奇 {odd_count} : 偶 {20-odd_count}", "原始陣列": draw})
         return pd.DataFrame(data), False, str(e)
 
-col_title, col_clock = st.columns([2, 1])
-with col_title:
-    st.markdown("<h1>🏆 HLF 賓果 AI 分析系統</h1>", unsafe_allow_html=True)
-    
-with col_clock:
-    clock_html = """
-    <div style="text-align: right; font-family: monospace;">
-        <div id="clock" style="font-size: 18px; font-weight: bold; color: #60a5fa; padding-top: 10px;"></div>
-        <div id="countdown" style="font-size: 12px; color: #ef4444; margin-top: 5px; font-weight: bold;"></div>
-    </div>
-    <script>
-        var timeLeft = 60;
-        function updateAll() {
-            var now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleDateString('zh-TW') + " " + now.toLocaleTimeString('zh-TW', { hour12: false });
-            document.getElementById('countdown').innerText = "🔄 距離更新： " + timeLeft + " 秒";
-            timeLeft--;
-            if (timeLeft < 0) {
-                timeLeft = 60; 
-                var btns = window.parent.document.querySelectorAll('button');
-                for(var i=0; i<btns.length; i++) {
-                    if(btns[i].innerText.includes('手動更新資料')) { btns[i].click(); break; }
-                }
-            }
-        }
-        setInterval(updateAll, 1000); updateAll();
-    </script>
-    """
-    components.html(clock_html, height=60)
+# --- 頂部區塊：標題 ---
+st.markdown("<h1>🏆 HLF 賓果 AI 分析系統</h1>", unsafe_allow_html=True)
 
-if st.button("🔄 手動更新資料", key="hidden_refresh"):
-    st.cache_data.clear()
+# --- 整合控制列 (時鐘 + 倒數 + 更新按鈕) ---
+# 將原本分開的按鈕和時間整合進同一個響應式區塊，保證在一行/平行顯示
+top_bar_html = """
+<div style="display: flex; justify-content: space-between; align-items: center; background-color: #1f2937; padding: 10px 15px; border-radius: 8px; border: 1px solid #374151; margin-bottom: 20px;">
+    <div style="font-family: monospace;">
+        <div id="clock" style="font-size: 15px; font-weight: bold; color: #60a5fa;"></div>
+        <div id="countdown" style="font-size: 12px; color: #ef4444; margin-top: 4px; font-weight: bold;"></div>
+    </div>
+    <div>
+        <a href="/?refresh=1" target="_parent" style="display: inline-block; background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%); color: white; padding: 8px 12px; border-radius: 5px; text-decoration: none; font-size: 13px; font-weight: bold; border: 1px solid #3b82f6; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🔄 手動更新</a>
+    </div>
+</div>
+<script>
+    var timeLeft = 60;
+    function updateAll() {
+        var now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleDateString('zh-TW') + " " + now.toLocaleTimeString('zh-TW', { hour12: false });
+        document.getElementById('countdown').innerText = "倒數更新： " + timeLeft + " 秒";
+        timeLeft--;
+        if (timeLeft < 0) {
+            window.parent.location.href = '/?refresh=1';
+        }
+    }
+    setInterval(updateAll, 1000); updateAll();
+</script>
+"""
+components.html(top_bar_html, height=85)
 
 result = fetch_real_bingo_data()
 df_history = result[0]
@@ -278,7 +298,6 @@ st.markdown("---")
 
 # ======== 區塊三：最新 30 期大數據統計 ========
 st.header("📊 最新 30 期開獎趨勢統計")
-st.write("所有指標隨開獎結果自動同步，即時更新。")
 
 consec_counts = Counter()
 for i in range(len(recent_30_arrays) - 1): 
@@ -295,7 +314,6 @@ for i in range(len(recent_30_arrays) - 1):
         for pair in itertools.combinations(sorted(intersect), 2): double_consec_counts[pair] += 1
 top_double_consec = double_consec_counts.most_common(10)
 
-# 縮短頁籤文字，確保手機版完美呈現
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔥 熱門", "❄️ 冷門", "🔁 連莊", "👯 雙連", "⏳ 遺漏"])
 with tab1: st.markdown(render_stat_balls(hot_20, "次"), unsafe_allow_html=True)
 with tab2: st.markdown(render_stat_balls(cold_20, "次", is_cold=True), unsafe_allow_html=True)
@@ -308,41 +326,34 @@ with tab4:
 with tab5: st.markdown(render_stat_balls(overdue_20, "期", is_cold=True), unsafe_allow_html=True)
 st.markdown("---")
 
-# ======== 區塊四：歷史明細 (手機自適應 HTML 表格) ========
+# ======== 區塊四：歷史明細 (卡片化完美自適應) ========
 with st.expander("📋 展開查看完整歷史開獎明細清單 (近 200 期)", expanded=False):
-    # 用 HTML 兜出響應式表格，取代原本不靈活的 st.dataframe
-    history_html = """
-    <div class='table-responsive'>
-        <table class='jyb-table'>
-            <thead>
-                <tr>
-                    <th style='width: 15%;'>期數</th>
-                    <th style='width: 55%; text-align: left;'>開獎號碼 (金字為超級獎號)</th>
-                    <th style='width: 15%;'>大小</th>
-                    <th style='width: 15%;'>奇偶</th>
-                </tr>
-            </thead>
-            <tbody>
-    """
+    # 使用卡片式排版取代死板的表格，杜絕手機左右滑動
+    history_cards_html = ""
     for idx, row in df_history.iterrows():
         nums = row['原始陣列']
         s_num = row['超級獎號']
-        num_str_list = []
+        
+        balls_html = ""
         for n in nums:
             if n == s_num:
-                num_str_list.append(f"<span style='color: #fbbf24; font-weight: 900;'>{n:02d}</span>")
+                balls_html += f"<div class='h-ball h-ball-super'>{n:02d}</div>"
             else:
-                num_str_list.append(f"{n:02d}")
-        # 用空白取代逗號，在手機上更緊湊
-        joined_nums = "&nbsp;&nbsp;".join(num_str_list)
+                balls_html += f"<div class='h-ball'>{n:02d}</div>"
         
-        history_html += f"<tr><td>{row['期數']}</td><td style='text-align: left; letter-spacing: 0.5px;'>{joined_nums}</td><td>{row['大小比例']}</td><td>{row['奇偶比例']}</td></tr>"
-    
-    history_html += "</tbody></table></div>"
-    st.markdown(history_html, unsafe_allow_html=True)
+        history_cards_html += f"""
+        <div class='history-card'>
+            <div class='history-header'>
+                <span class='history-period'>第 {row['期數']} 期</span>
+                <span class='history-stats'>{row['大小比例']} | {row['奇偶比例']}</span>
+            </div>
+            <div class='history-balls'>{balls_html}</div>
+        </div>
+        """
+    st.markdown(history_cards_html, unsafe_allow_html=True)
 st.markdown("---")
 
-# ======== 區塊五：玩法介紹與免責聲明 (完美跨欄表格) ========
+# ======== 區塊五：玩法介紹與免責聲明 ========
 st.header("💡 BINGO BINGO 賓果賓果 玩法與獎金規則")
 st.markdown("""
 **【多樣化玩法介紹】**
@@ -379,13 +390,22 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.warning("""
-**⚠️ 網站免責聲明：**
-本站提供之預測號碼與統計大數據，均由 AI 演算法與歷史開獎資料計算得出。所有資訊僅供學術交流、數據分析與娛樂參考之用，絕對不保證未來中獎機率。
-請使用者衡量自身財務狀況，保持理性投注，切勿過度沉迷。本站為獨立開發者之個人專案，與「台灣彩券股份有限公司」無任何官方合作、背書或從屬關係。
-""")
+# 免責聲明：使用自訂 HTML 將字體縮小，不再跟玩法文字一樣大
+st.markdown("""
+<div style="background-color: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; margin-top: 10px;">
+    <p style="color: #fca5a5; font-size: 13px; font-weight: bold; margin-bottom: 5px;">⚠️ 網站免責聲明：</p>
+    <p style="color: #fecaca; font-size: 12px; line-height: 1.6; margin: 0;">本站提供之預測號碼與統計大數據，均由 AI 演算法與歷史開獎資料計算得出。所有資訊僅供學術交流、數據分析與娛樂參考之用，絕對不保證未來中獎機率。請使用者衡量自身財務狀況，保持理性投注，切勿過度沉迷。本站為獨立開發者之個人專案，與「台灣彩券股份有限公司」無任何官方合作、背書或從屬關係。</p>
+</div>
+""", unsafe_allow_html=True)
 
-# --- 系統更新時間標籤 ---
+# --- 系統更新時間標籤 (抓取程式碼實體檔案最後修改時間) ---
 tw_tz = timezone(timedelta(hours=8))
-current_time = datetime.now(tw_tz).strftime("%Y-%m-%d %H:%M:%S")
-st.markdown(f"<div style='text-align: center; color: #6b7280; margin-top: 50px; font-size: 12px;'>系統最後更新時間：{current_time} (依據伺服器自動校時)</div>", unsafe_allow_html=True)
+try:
+    # 抓取這份 app.py 檔案最後一次存檔的時間
+    file_mtime = os.path.getmtime(__file__)
+    update_time = datetime.fromtimestamp(file_mtime, tw_tz).strftime("%Y-%m-%d %H:%M:%S")
+except:
+    # 萬一在某些雲端伺服器抓不到檔案時間的備用方案
+    update_time = datetime.now(tw_tz).strftime("%Y-%m-%d %H:%M:%S")
+
+st.markdown(f"<div style='text-align: center; color: #6b7280; margin-top: 50px; font-size: 12px;'>程式碼最後更新時間：{update_time}</div>", unsafe_allow_html=True)
