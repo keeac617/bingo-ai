@@ -9,6 +9,7 @@ import re
 import streamlit.components.v1 as components
 import itertools
 import os
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 
 # --- 網頁基本設定 ---
@@ -442,46 +443,44 @@ def show_game_page(game_name):
         if st.button("三星彩", key="nav_3d", use_container_width=True): st.session_state.current_game = "三星彩"; st.rerun()
         if st.button("四星彩", key="nav_4d", use_container_width=True): st.session_state.current_game = "四星彩"; st.rerun()
     
-    title_col, clock_col = st.columns([2, 1])
+    # 將標題、原生按鈕、時鐘分為三個欄位，確保原生按鈕絕對有效且版面靠攏
+    title_col, btn_col, clock_col = st.columns([2.5, 0.8, 1])
     with title_col:
-        st.markdown(f"<h1>🏆 HLF {game_name} AI 分析終端</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1>🏆 HLF {game_name} AI 分析</h1>", unsafe_allow_html=True)
     
+    with btn_col:
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True) # 產生微調的間距對齊標題
+        if st.button("🔄 手動更新", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
     with clock_col:
-        # 根據是否為賓果決定是否顯示倒數計時器與動態真實時間運算
+        # 僅在賓果賓果頁面顯示 60 秒倒數計時器
         if game_name == "賓果賓果":
             countdown_div = '<div id="countdown" style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 1px; white-space: nowrap;"></div>'
             js_timer_logic = """
-                var currentMin = now.getMinutes();
-                var currentSec = now.getSeconds();
-                
-                // 動態計算距離下一個 5 分鐘整點（00, 05, 10...）的剩餘秒數
-                var nextMin = Math.ceil((currentMin + 0.1) / 5) * 5;
-                if (nextMin === currentMin) nextMin += 5;
-                var totalSecondsLeft = ((nextMin - currentMin) * 60) - currentSec;
-                
-                document.getElementById('countdown').innerText = "距離自動更新： " + totalSecondsLeft + " 秒";
-                
-                // 倒數到 0 時，利用時間戳記強制瀏覽器破除快取並刷新網頁
-                if (totalSecondsLeft <= 0) {
-                    window.parent.location.search = '?refresh=' + new Date().getTime();
+                document.getElementById('countdown').innerText = "距離自動更新： " + timeLeft + " 秒";
+                timeLeft--;
+                if (timeLeft < 0) {
+                    timeLeft = 60; 
+                    // 自動倒數結束時，從背景找出原生的手動更新按鈕並觸發點擊
+                    var btns = window.parent.document.querySelectorAll('button');
+                    for(var i=0; i<btns.length; i++) {
+                        if(btns[i].innerText.includes('手動更新')) { btns[i].click(); break; }
+                    }
                 }
             """
         else:
             countdown_div = ''
             js_timer_logic = ""
 
-        # 利用精確的網頁樣式控制，確保手動更新按鈕與時間在電腦畫面上緊密靠右並排
-        top_bar_html = f"""
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; width: 100%; margin-top: 5px;">
-            <button onclick="window.parent.location.search = '?refresh=' + new Date().getTime();" style="background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%); color: white; padding: 5px 12px; border-radius: 5px; border: 1px solid #3b82f6; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; height: 32px;">
-                🔄 手動更新
-            </button>
-            <div style="text-align: right; font-family: monospace; line-height: 1.3;">
-                <div id="clock" style="font-size: 15px; font-weight: bold; color: #60a5fa; white-space: nowrap;"></div>
-                {countdown_div}
-            </div>
+        clock_html = f"""
+        <div style="text-align: right; font-family: monospace; line-height: 1.3; margin-top: 5px;">
+            <div id="clock" style="font-size: 15px; font-weight: bold; color: #60a5fa; white-space: nowrap;"></div>
+            {countdown_div}
         </div>
         <script>
+            var timeLeft = 60;
             function updateAll() {{
                 var now = new Date();
                 document.getElementById('clock').innerText = now.toLocaleDateString('zh-TW') + " " + now.toLocaleTimeString('zh-TW', {{ hour12: false }});
@@ -490,7 +489,7 @@ def show_game_page(game_name):
             setInterval(updateAll, 1000); updateAll();
         </script>
         """
-        components.html(top_bar_html, height=45)
+        components.html(clock_html, height=50)
 
     try:
         df_history = fetch_universal_data(game_name)
