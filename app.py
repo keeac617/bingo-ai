@@ -114,14 +114,24 @@ st.markdown("""
     }
     .back-to-top:hover { transform: scale(1.1); }
 
-    /* 手機版排版優化：自動折行導覽列與預測按鈕，避免垂直拉太長 */
+    /* 手機版排版終極優化：強制所有欄位橫向自動折行，不使用相容性差的語法 */
     @media (max-width: 768px) {
-        div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) {
+        div[data-testid="stHorizontalBlock"] {
+            flex-direction: row !important;
             flex-wrap: wrap !important;
+            gap: 5px !important;
         }
-        div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) > div[data-testid="column"] {
-            min-width: calc(30% - 10px) !important;
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            width: auto !important;
+            min-width: 28% !important; 
             flex: 1 1 auto !important;
+            padding: 0 !important;
+        }
+        /* 讓手機版導覽按鈕稍微縮小，排列更緊湊 */
+        div.stButton > button {
+            padding: 4px 8px !important;
+            font-size: 13px !important;
+            min-height: 38px !important;
         }
     }
 </style>
@@ -399,13 +409,24 @@ def show_home_page():
     st.markdown("<h1 style='text-align: center; color: #60a5fa !important; padding-top: 40px;'>🏦 HLF 綜合彩券 AI 分析總署</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #9ca3af !important; margin-bottom: 40px;'>請選擇您要進行預測與分析的彩券項目</p>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
-    cols = [col1, col2, col3, col1, col2, col3]
-    for idx, (game, cfg) in enumerate(GAME_CONFIG.items()):
-        with cols[idx]:
-            if st.button(f"✨ {game}\n\n{cfg['desc']}", key=f"btn_{game}", use_container_width=True):
-                st.session_state.current_game = game
-                st.rerun()
+    games = list(GAME_CONFIG.items())
+    
+    # 強制使用「列優先」分配法，確保手機版垂直排列的順序完全一致
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button(f"✨ {games[0][0]}\n\n{games[0][1]['desc']}", key="btn_h0", use_container_width=True): st.session_state.current_game = games[0][0]; st.rerun()
+    with c2:
+        if st.button(f"✨ {games[1][0]}\n\n{games[1][1]['desc']}", key="btn_h1", use_container_width=True): st.session_state.current_game = games[1][0]; st.rerun()
+    with c3:
+        if st.button(f"✨ {games[2][0]}\n\n{games[2][1]['desc']}", key="btn_h2", use_container_width=True): st.session_state.current_game = games[2][0]; st.rerun()
+        
+    c4, c5, c6 = st.columns(3)
+    with c4:
+        if st.button(f"✨ {games[3][0]}\n\n{games[3][1]['desc']}", key="btn_h3", use_container_width=True): st.session_state.current_game = games[3][0]; st.rerun()
+    with c5:
+        if st.button(f"✨ {games[4][0]}\n\n{games[4][1]['desc']}", key="btn_h4", use_container_width=True): st.session_state.current_game = games[4][0]; st.rerun()
+    with c6:
+        if st.button(f"✨ {games[5][0]}\n\n{games[5][1]['desc']}", key="btn_h5", use_container_width=True): st.session_state.current_game = games[5][0]; st.rerun()
 
 def show_game_page(game_name):
     cfg = GAME_CONFIG[game_name]
