@@ -13,7 +13,7 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 
 # --- 網頁基本設定 ---
-st.set_page_config(page_title="HLF 綜合彩券 AI 分析總署", layout="wide")
+st.set_page_config(page_title="HLF 綜合彩券 AI 分析總署", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 設定返回最上層的隱形錨點 ---
 st.markdown("<div id='top-anchor'></div>", unsafe_allow_html=True)
@@ -53,6 +53,25 @@ GAME_CONFIG = {
 st.markdown("""
 <style>
     .stApp { background-color: #0a0e17 !important; }
+    
+    /* 側邊欄深色背景化，解決白底刺眼問題 */
+    [data-testid="stSidebar"] { background-color: #111827 !important; border-right: 1px solid #374151 !important; }
+    [data-testid="stSidebarHeader"] { background-color: #111827 !important; }
+    
+    /* 強制側邊欄縮放/展開按鈕常駐顯眼，拒絕滑鼠移入才顯示 */
+    button[data-testid="stSidebarCollapseButton"] {
+        opacity: 1 !important;
+        visibility: visible !important;
+        background-color: #1e40af !important; /* 科技深藍色底色 */
+        color: #ffffff !important;            /* 白色箭頭圖示 */
+        border: 1px solid #3b82f6 !important; /* 亮藍色邊框 */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5) !important; /* 按鈕陰影提升立體感 */
+        transition: background-color 0.2s !important;
+    }
+    button[data-testid="stSidebarCollapseButton"]:hover {
+        background-color: #2563eb !important; /* 滑鼠懸停時變亮 */
+    }
+    
     body, p, span, div, li, h2, h3, h4, h5, h6, label { color: #e2e8f0 !important; }
     h1 { font-size: min(6vw, 2.2rem) !important; white-space: nowrap !important; color: #e2e8f0 !important; margin-bottom: 5px !important; }
 
