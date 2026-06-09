@@ -44,8 +44,8 @@ GAME_CONFIG = {
     "大樂透": {"pool": 49, "draws": 6, "super": True, "desc": "01～49號，每期開6碼+1特別號"},
     "威力彩": {"pool": 38, "draws": 6, "super": True, "desc": "第一區01～38號，第二區01～08號"},
     "今彩539": {"pool": 39, "draws": 5, "super": False, "desc": "01～39號，每期開5碼"},
-    "四星彩": {"pool": 9, "draws": 4, "super": False, "desc": "四位數字，各0～9"},
-    "三星彩": {"pool": 9, "draws": 3, "super": False, "desc": "三位數字，各0～9"}
+    "三星彩": {"pool": 9, "draws": 3, "super": False, "desc": "三位數字，各0～9"},
+    "四星彩": {"pool": 9, "draws": 4, "super": False, "desc": "四位數字，各0～9"}
 }
 
 # --- 質感深色主題與全站 CSS ---
@@ -113,6 +113,17 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 2px solid #60a5fa; transition: transform 0.3s;
     }
     .back-to-top:hover { transform: scale(1.1); }
+
+    /* 手機版排版優化：自動折行導覽列與預測按鈕，避免垂直拉太長 */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) {
+            flex-wrap: wrap !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) > div[data-testid="column"] {
+            min-width: calc(30% - 10px) !important;
+            flex: 1 1 auto !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -404,8 +415,8 @@ def show_game_page(game_name):
     if nav_cols[2].button("大樂透", key="nav_lotto"): st.session_state.current_game = "大樂透"; st.rerun()
     if nav_cols[3].button("威力彩", key="nav_power"): st.session_state.current_game = "威力彩"; st.rerun()
     if nav_cols[4].button("今彩539", key="nav_539"): st.session_state.current_game = "今彩539"; st.rerun()
-    if nav_cols[5].button("四星彩", key="nav_4d"): st.session_state.current_game = "四星彩"; st.rerun()
-    if nav_cols[6].button("三星彩", key="nav_3d"): st.session_state.current_game = "三星彩"; st.rerun()
+    if nav_cols[5].button("三星彩", key="nav_3d"): st.session_state.current_game = "三星彩"; st.rerun()
+    if nav_cols[6].button("四星彩", key="nav_4d"): st.session_state.current_game = "四星彩"; st.rerun()
     st.markdown("---")
     
     title_col, clock_col = st.columns([2, 1])
@@ -413,28 +424,39 @@ def show_game_page(game_name):
         st.markdown(f"<h1>🏆 HLF {game_name} AI 分析終端</h1>", unsafe_allow_html=True)
     
     with clock_col:
-        # 利用精確的網頁樣式控制，確保手動更新按鈕與時間、倒數計時元件在電腦畫面上緊密靠右並排
-        top_bar_html = """
+        # 根據是否為賓果決定是否顯示倒數計時器與對應的 JS
+        if game_name == "賓果賓果":
+            countdown_div = '<div id="countdown" style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 1px; white-space: nowrap;"></div>'
+            js_timer_logic = """
+                document.getElementById('countdown').innerText = "距離自動更新： " + timeLeft + " 秒";
+                timeLeft--;
+                if (timeLeft < 0) {
+                    timeLeft = 60; // 歸零防止負數顯示
+                    window.parent.location.href = window.parent.location.pathname + '?refresh=1';
+                }
+            """
+        else:
+            countdown_div = ''
+            js_timer_logic = ""
+
+        # 利用精確的網頁樣式控制，確保手動更新按鈕與時間在電腦畫面上緊密靠右並排
+        top_bar_html = f"""
         <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; width: 100%; margin-top: 5px;">
-            <button onclick="window.parent.location.href='/?refresh=1';" style="background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%); color: white; padding: 5px 12px; border-radius: 5px; border: 1px solid #3b82f6; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; height: 32px;">
+            <button onclick="window.parent.location.href = window.parent.location.pathname + '?refresh=1';" style="background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%); color: white; padding: 5px 12px; border-radius: 5px; border: 1px solid #3b82f6; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; height: 32px;">
                 🔄 手動更新
             </button>
             <div style="text-align: right; font-family: monospace; line-height: 1.3;">
                 <div id="clock" style="font-size: 15px; font-weight: bold; color: #60a5fa; white-space: nowrap;"></div>
-                <div id="countdown" style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 1px; white-space: nowrap;"></div>
+                {countdown_div}
             </div>
         </div>
         <script>
             var timeLeft = 60;
-            function updateAll() {
+            function updateAll() {{
                 var now = new Date();
-                document.getElementById('clock').innerText = now.toLocaleDateString('zh-TW') + " " + now.toLocaleTimeString('zh-TW', { hour12: false });
-                document.getElementById('countdown').innerText = "距離自動更新： " + timeLeft + " 秒";
-                timeLeft--;
-                if (timeLeft < 0) {
-                    window.parent.location.href = '/?refresh=1';
-                }
-            }
+                document.getElementById('clock').innerText = now.toLocaleDateString('zh-TW') + " " + now.toLocaleTimeString('zh-TW', {{ hour12: false }});
+                {js_timer_logic}
+            }}
             setInterval(updateAll, 1000); updateAll();
         </script>
         """
