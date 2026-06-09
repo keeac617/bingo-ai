@@ -106,7 +106,7 @@ st.markdown("""
     @media (max-width: 768px) { .jyb-table { font-size: 12px; } .jyb-table th, .jyb-table td { padding: 5px; } }
 
     .back-to-top {
-        position: fixed; bottom: 30px; right: 30px; z-index: 99999;
+        position: fixed; bottom: 80px; right: 30px; z-index: 99999;
         background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
         color: white !important; width: 50px; height: 50px; line-height: 45px;
         text-align: center; border-radius: 50%; font-size: 24px; text-decoration: none;
